@@ -4,6 +4,7 @@ import networktables as nt
 import cv2 
 import time
 import numpy as np 
+import math
 
 #time.sleep(15)
 
@@ -32,10 +33,10 @@ camWid = 640
 camHgt = 480
 
 #Variables that will be needed to do distance calculations - FIRST Gen. Variables 
-DefaultImageHeight = 480
-DefaultBallHeightPixel = 100 #WE NEED TO CALCULATE THIS
-DefaultPixelsPerInch = 50 #WE NEED TO CALCULATE THIS 
-CalibrationDistanceInch = 24 
+DefaultImageHeight = 240
+DefaultBallHeightPixel = 121.243 
+DefaultPixelsPerInch = 17.32  
+CalibrationDistanceInch = 12 
 
 MaxPossibleAngle = 60 # MEASURED IN DEGREES 
 MaxPossibleDistance = 120 # MEASURED IN INCHES
@@ -61,6 +62,8 @@ dim = (width, height)
 
 runCalculation = True
 
+visionCounter = 0
+
 
 def Vision():
 
@@ -75,6 +78,7 @@ def Vision():
     if cameraFeed == 0:
         
         print("Using front camera")
+        visionCounter += 1
 
         try:
             SmartDashboard.putString("VisionCodeSelected", "0")
@@ -124,6 +128,16 @@ def Vision():
             DirectDistanceBallInch = ((ActualBallHeightPixel / (2 * biggest_radius)) * CalibrationDistanceInch)
             XDisaplacementPixel = biggestX - (width / 2)
             YDisplacmentPixel = biggestY - (height / 2)
+            YAngle = math.atan(YDisplacmentPixel/(ActualPixelsPerInch * DefaultPixelsPerInch)) #MEASURED IN RADIANS
+            XAngle = math.atan(XDisplacement/(ActualPixelsPerInch * DefaultPixelsPerInch)) * (180/np.pi) #MEASURED IN DEGREES
+
+            ZDistance = DirectDistanceBallInch * math.cos(YAngle) #ROBOT DISTANCE TO BALL
+            
+
+            try:
+                SmartDashboard.putNumber("VisionCounter", visionCounter) 
+                SmartDashboard.putNumber("ZDistance", ZDistance)
+                SmartDashboard.putNumber("DirectDistance", XAngle)
 
             draw = cv2.circle(draw, (biggestX, biggestY), biggest_radius, (255, 0, 0), 5)
 
@@ -134,8 +148,10 @@ def Vision():
     if cameraFeed == 1:
 
         print("Using back camera")
+        visionCounter += 1
 
         try:
+            SmartDashboard.putNumber("VisionCounter", visionCounter)
             SmartDashboard.putString("VisionCodeSelected", "1")
         except:
             print("Cannot put string because network table was not found")
