@@ -17,10 +17,10 @@ try:
 except:
     print("No network table found continuing with the rest of the code")
 
-Back = cs.startAutomaticCapture(name = "BackCamera", path = "/dev/v4l/by-path/platform-3f980000.usb-usb-0:1.3:1.0-video-index0")
+Back = cs.startAutomaticCapture(name = "BackCamera", path = "/dev/v4l/by-path/platform-3f980000.usb-usb-0:1.2:1.0-video-index0")
 Back.setResolution(640, 480)
 
-Front = cs.startAutomaticCapture(name = "FrontCamera", path = "/dev/v4l/by-path/platform-3f980000.usb-usb-0:1.2:1.0-video-index0")
+Front = cs.startAutomaticCapture(name = "FrontCamera", path = "/dev/v4l/by-path/platform-3f980000.usb-usb-0:1.1:1.0-video-index0")
 Front.setResolution(640, 480)
 
 server = cs.addSwitchedCamera("SwitchedCamera")
