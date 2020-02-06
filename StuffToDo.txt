@@ -1,0 +1,5 @@
+add timer - to track 
+is there a resize function - by 1/2
+Hough transform for circle identification right off inrange
+Recode find biggest contour to find biggest circle radius
+cut down resolution 
