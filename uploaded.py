@@ -4,6 +4,14 @@
 # Open Source Software - may be modified and shared by FRC teams. The code
 # must be accompanied by the FIRST BSD license file in the root directory of
 # the project.
+#
+#This is how to understand the comments
+#
+#Gen. variable system:
+#
+#Generation variable system work on the fact that first generation variables 
+#have values that we know of and second generation variables use values from 
+#the first
 #----------------------------------------------------------------------------
 
 import json
@@ -238,62 +246,82 @@ if __name__ == "__main__":
     for config in switchedCameraConfigs:
         startSwitchedCamera(config)
 
+
+    """
+    EVERYTHING BELOW THIS IS ADDITIONAL CODE THAT HAS BEEN LATER DECIDED TO BE ADDEED
+    TO THIS PYTHON FILE
+    """
+
+    #Print statements let operator know whether a camera has been added or not
     print("Size of cameras: " + str(len(cameras)))
     print("Size of cameraConfigs: " + str(len(cameraConfigs)))
     print("Size of switchedCameraConfigs: " + str(len(switchedCameraConfigs)))
     
-    #NewCamera = startCamera(configFile)
-
+    #Getting CameraServer instance and starting capture
     cs = CameraServer.getInstance()
-
     camera = cs.startAutomaticCapture()
-
+    #Setting Resolution
     camera.setResolution(640, 480)
 
     # Get a CvSink. This will capture images from the camera
     cvSink = cs.getVideo()
 
+    #Camera width and height will essentially equal the resolution that has been hardcoded
     camWid = 640
     camHgt = 480
 
+    #Print statement for debugging
     print("Starting 1259Vision.py")
 
-    #test_registry()
-
+    #Variables that will be needed to do distance calculations - FIRST Gen. Variables 
     radiansToDegrees = 180 / np.pi
-
     calibCameraDistInch = 20
     sizeOfFuelCellInch = 7
     sizeOfFuelCellPixel = 106
+    #Image saving switch
+    SaveImages = False
 
+    #Variables needed to distance calculations - SECOND Gen. Variables
     focalLengthPixel = sizeOfFuelCellPixel * calibCameraDistInch / sizeOfFuelCellInch
     pixelsPerInch = (sizeOfFuelCellPixel / sizeOfFuelCellInch)
     focalLengthTimesFuelCellSize = focalLengthPixel * sizeOfFuelCellInch   # distance = focalLengthTimesFuelCellSize / fitted circle size in pixels
 
+    #Checking whether OpenCV works on the system, printing the version number
     print("Using OpenCV version ", cv2.__version__)
 
+    #Maximum and minimum possible HSV values to detect the ball
     minHSVBall = np.array([18, 100, 100])
     maxHSVBall = np.array([30, 255, 255])
 
+    #X and Y coordinate of the center of the image
     imageCenterX = camWid / 2
     imageCenterY = camHgt / 2
 
-    print("Starting main loop")
+    #STILL NOT SURE WHY THESE VALUES ARE NEEDED 
     fpsAccum = 0
     elapsedAccum = 0
     elapsedAccumCamRead = 0
     loopCount = 1
-    #pixelsPerInch = (8/430.1687206)
 
+    #Printing Camera information
     print("FPS,AvgFPS,LoopTime [ms],AvgLoopTime [ms],CameraReadTime [ms],AvgCameraRead [ms],Dist [in],HorzAngle [deg]")
+
+    #Pre defining an empty image for the program to use/fill
     img = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
     
-    
+    print("Starting main loop")
     # loop forever
     while True:
-        loopCount += 1
+
+        #Grabbing image as a vatriable from opencv sink
         time0, draw = cvSink.grabFrame(img)
-        #cv2.imwrite("SomeImage%d.jpg" % (loopCount), draw)
+
+        if SaveImages:
+            loopCount += 1
+            cv2.imwrite("SomeImage%d.jpg" % (loopCount), draw)
+            #Wait time if needed
+            time.sleep(0.5)
+        
         #Convert the RGB image to HSV
         imHSV = cv2.cvtColor(draw, cv2.COLOR_BGR2HSV)
         #Find pixels in the blurred image that fit in range and turn them white and others black                                          
@@ -312,20 +340,6 @@ if __name__ == "__main__":
 
         #Using the contours approximate a rectangle to fit the shape
         center, radius = cv2.minEnclosingCircle(cnt)
-        #radiusInt = cv2.boxPoints(rect)
-        #box = np.int0(box)
-        #Calculating Distance
-        #(x, y), (width, height), angle = rect
-        #if (width > height):
-        #    angle = angle - 90
-        #    width, height = height, width
-
-        #print("Height of image: " + str(height))
-        #DistZ = (8.046355677641872 - (height * pixelsPerInch)) + 8.046355677641872
-        #print("The object is: " + str(DistZ) + " in away from you")
-        #print("The angle is: " + str(angle))
-        #except:
-         #   print("No contour found!")
 
         #Using moments to find the center of the image
         #try:
@@ -333,8 +347,4 @@ if __name__ == "__main__":
         #cX = int(M["m10"] / M["m00"])
         #cY = int(M["m01"] / M["m00"])
 
-        #img_number += 1
-        time.sleep(0.5)
-    
-   # def getImage():
-        #return draw
+        
