@@ -274,40 +274,44 @@ if __name__ == "__main__":
     print("Starting 1259Vision.py")
 
     #Variables that will be needed to do distance calculations - FIRST Gen. Variables 
-    radiansToDegrees = 180 / np.pi
-    calibCameraDistInch = 20
-    sizeOfFuelCellInch = 7
-    sizeOfFuelCellPixel = 106
+    DefaultImageHeight = 480
+    DefaultBallHeightPixel = 100 """ WE NEED TO CALCULATE THIS"""
+    DefaultPixelsPerInch = 50 """ WE NEED TO CALCULATE THIS """
+    CalibrationDistanceInch = 24 
+
+    MaxPossibleAngle = 60 """ MEASURED IN DEGREES """
+    MaxPossibleDistance = 120 """ MEASURED IN INCHES """
+    
+
     #Image saving switch
     SaveImages = False
 
     #Variables needed to distance calculations - SECOND Gen. Variables
-    focalLengthPixel = sizeOfFuelCellPixel * calibCameraDistInch / sizeOfFuelCellInch
-    pixelsPerInch = (sizeOfFuelCellPixel / sizeOfFuelCellInch)
-    focalLengthTimesFuelCellSize = focalLengthPixel * sizeOfFuelCellInch   # distance = focalLengthTimesFuelCellSize / fitted circle size in pixels
+    MaxPossibleRadius = (DefaultImageHeight / 2) """ MEASURED IN INCHES """
+    MinPossibleRadius = 0   """ WE NEED TO CALCULATE THIS """
 
     #Checking whether OpenCV works on the system, printing the version number
     print("Using OpenCV version ", cv2.__version__)
 
     #Maximum and minimum possible HSV values to detect the ball
     minHSVBall = np.array([18, 100, 100])
-    maxHSVBall = np.array([30, 255, 255])
+    maxHSVBall = np.array([40, 255, 255])
 
     #X and Y coordinate of the center of the image
     imageCenterX = camWid / 2
     imageCenterY = camHgt / 2
-
-    #STILL NOT SURE WHY THESE VALUES ARE NEEDED 
-    fpsAccum = 0
-    elapsedAccum = 0
-    elapsedAccumCamRead = 0
-    loopCount = 1
 
     #Printing Camera information
     print("FPS,AvgFPS,LoopTime [ms],AvgLoopTime [ms],CameraReadTime [ms],AvgCameraRead [ms],Dist [in],HorzAngle [deg]")
 
     #Pre defining an empty image for the program to use/fill
     img = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
+
+    scale_percent = 50 # percent of original size
+    width = int(img.shape[1] * scale_percent / 100)
+    height = int(img.shape[0] * scale_percent / 100)
+    dim = (width, height)
+
     
     print("Starting main loop")
     # loop forever
@@ -316,32 +320,38 @@ if __name__ == "__main__":
         #Grabbing image as a vatriable from opencv sink
         time0, draw = cvSink.grabFrame(img)
 
-        if SaveImages:
-            loopCount += 1
-            cv2.imwrite("SomeImage%d.jpg" % (loopCount), draw)
-            #Wait time if needed
-            time.sleep(0.5)
+        draw = cv2.resize(draw, dim, interpolation = cv2.INTER_AREA)
         
         #Convert the RGB image to HSV
         imHSV = cv2.cvtColor(draw, cv2.COLOR_BGR2HSV)
         #Find pixels in the blurred image that fit in range and turn them white and others black                                          
         InRange = cv2.inRange(imHSV, minHSVBall, maxHSVBall)
 
-        #Using the black and white binary image, plot a point at every boundry pixel that is white
-        _, contours, _ = cv2.findContours(InRange, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+        InRange = cv2.GaussianBlur(InRange, (5, 5), cv2.BORDER_DEFAULT)
 
-        #Find the biggest contour since that will be the object we are looking for
-        #try:
-        areas = [cv2.contourArea(c) for c in contours]
-        max_index = np.argmax(areas)
-        cnt=contours[max_index]
-        #except:
-            #print("Could not find any contours")
+        circles = cv2.HoughCircles(InRange, cv2.HOUGH_GRADIENT, 1, int(height/10), 100, 25, 5, int(height/2))
+        circles = np.uint16(np.around(circles))
 
-        #Using the contours approximate a rectangle to fit the shape
-        center, radius = cv2.minEnclosingCircle(cnt)
+        biggest_radius = 0;
+        for i in circles[0,:]:
+            if (biggest_radius < i[2]):
+                biggest_radius = i[2]
+                biggestX = i[0]
+                biggestY = i[1]
+            
+        ActualBallHeightPixel = DefaultBallHeightPixel / (DefaultImageHeight / height)
+        ActualPixelsPerInch = DefaultPixelsPerInch / (DefaultImageHeight / height)
+
+        DirectDistanceBallInch = ((ActualBallHeightPixel / (2 * biggest_radius)) * CalibrationDistanceInch)
+        XDisaplacementPixel = biggestX - (width / 2)
+        YDisplacmentPixel = biggestY - (height / 2)
 
         #Using moments to find the center of the image
+        if SaveImages:
+            loopCount += 1
+            cv2.imwrite("SomeImage%d.jpg" % (loopCount), draw)
+            #Wait time if needed
+            time.sleep(0.5)
         #try:
         #M = cv2.moments(box)
         #cX = int(M["m10"] / M["m00"])
