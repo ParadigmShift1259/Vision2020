@@ -1,99 +1,87 @@
-#importing modules needed
-import cv2                                                                                  
-import numpy as np
+import cscore
+import networktables as nt 
+
+import cv2 
 import time
-import math
+import numpy as np 
 
-radiansToDegrees = 180 / np.pi
+time.sleep(15)
 
-imageCenterX = 640 / 2
-imageCenterY = 480 / 2
+cs = cscore.CameraServer.getInstance()
+cs.enableLogging()
 
-calibCameraDistInch = 51
-sizeOfFuelCellInch = 7
-sizeOfFuelCellPixel = 104
+try:
+    nt.NetworkTables.initialize(server="10.12.59.2")
+    print("NetworkTable found!")
+    SmartDashboard = nt.NetworkTables.getTable("SmartDashboard")
+except:
+    print("No network table found continuing with the rest of the code")
 
-focalLengthPixel = sizeOfFuelCellPixel * calibCameraDistInch / sizeOfFuelCellInch
-pixelsPerInch = (sizeOfFuelCellPixel / sizeOfFuelCellInch)
-focalLengthTimesFuelCellSize = focalLengthPixel * sizeOfFuelCellInch   # distance = focalLengthTimesFuelCellSize / fitted circle size in pixels
-#focalLengthNumerator = 753.25 * sizeOfFuelCellInch
+Back = cs.startAutomaticCapture(name = "BackCamera", path = "/dev/v4l/by-path/platform-3f980000.usb-usb-0:1.3:1.0-video-index0")
+Back.setResolution(640, 480)
 
-#HSV values for the yellow game ball
-#minHSVBall = np.array([28,  76,  89])
-#maxHSVBall = np.array([36, 255, 255])
-minHSVBall = np.array([18,  90,  90])
-maxHSVBall = np.array([30, 255, 255])
+Front = cs.startAutomaticCapture(name = "FrontCamera", path = "/dev/v4l/by-path/platform-3f980000.usb-usb-0:1.2:1.0-video-index0")
+Front.setResolution(640, 480)
 
-#Font that will be used to display the text on screen
-font = cv2.FONT_HERSHEY_SIMPLEX
+server = cs.addSwitchedCamera("SwitchedCamera")
 
-#start the camera                                                                  
-vc = cv2.VideoCapture(0)                                                                    
+print("Assigning Variables")
+FrontCameraSetup = True
+BackCameraSetup = False
 
-#If camera is open and taking shots
-if vc.isOpened():                                                                           
-    rval, frame = vc.read() 
-else:                                                                                       
-    rval = False
 
-saveCount = 0
-elapsedAccum = 0
-elapsedAccumCamRead = 0
-loopCount = 1
-#Do this while reading images
-print("Using OpenCV version ", cv2.__version__)
-print("Sec per loop,Avg loop,Sec camera read,Avg camera read,Dist,HorzAngle")
-while rval:
-    # start timing
-    startTime = time.time()
-    rval, frame = vc.read()  
-    endTime = time.time()
-    elapsedCam = endTime - startTime
+def Vision():
 
-    #Convert the RGB image to HSV
-    imHSV = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    #Find pixels in the blurred image that fit in range and turn them white and others black                                          
-    InRange = cv2.inRange(imHSV, minHSVBall, maxHSVBall)
+    global FrontCameraSetup
+    global BackCameraSetup
 
-    #Using the black and white binary image, plot a point at every boundry pixel that is white
-    _, contours, _ = cv2.findContours(InRange, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-
-    #Find the biggest contour since that will be the object we are looking for
     try:
-        areas = [cv2.contourArea(c) for c in contours]
-        max_index = np.argmax(areas)
-        cnt=contours[max_index]
+    	cameraFeed = SmartDashboard.getNumber("cameraFeed", 0)
     except:
-        print("Could not find any contours")
-        continue
+        cameraFeed = 0
+        print("Couldn't get cameraFeed value because no network table was found\nDefault to 0")
 
-    # Use openCV circle to estimate dist and angle
-    center,radius = cv2.minEnclosingCircle(cnt)
-    radiusInt = int(radius)
-    centerInt = (int (center[0]), int (center[1]))
-    height = 2 * radius
-    #print("Height of image based on circle: " + str(height))
+    if cameraFeed == 0:
+        
+        print("Using front camera")
+
+        try:
+            SmartDashboard.putString("VisionCodeSelected", "0")
+        except:
+            print("Cannot put string because network table was not found")
+        #server.setSource(Front)
+        Front.setConnectionStrategy(cscore.VideoSource.ConnectionStrategy.kKeepOpen)
+        Back.setConnectionStrategy(cscore.VideoSource.ConnectionStrategy.kForceClose)
+
+        #mjpegServer = cscore.MjpegServer("httpserver", 8081)
+        #mjpegServer.setSource(Front)
+
+        cvSink = cscore.CvSink("FrontSink")
+        cvSink.setSource(Front)
+
+        cvSource = cscore.CvSource("FrontCVSource", cscore.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
+        #cvMjpegServer = cscore.MjpegServer("FrontHttpServer", 8082)
+        #cvMjpegServer.setSource(cvSource)
+            
+        img = np.zeros(shape=(640, 480, 3), dtype=np.uint8)
+                
+        time, img = cvSink.grabFrame(img)
+        cvSource.putFrame(img)
+
+    if cameraFeed == 1:
+
+        print("Using back camera")
+
+        try:
+            SmartDashboard.putString("VisionCodeSelected", "1")
+        except:
+            print("Cannot put string because network table was not found")
+
+        Front.setConnectionStrategy(cscore.VideoSource.ConnectionStrategy.kForceClose)
+        Back.setConnectionStrategy(cscore.VideoSource.ConnectionStrategy.kKeepOpen)
+
+
+while True:
+	Vision()
+
     
-    DistZ = focalLengthTimesFuelCellSize / height
-
-    horzDistPixel = center[0] - imageCenterX
-    horzDistInch = horzDistPixel / pixelsPerInch
-    horzAngleRadians = math.atan(horzDistInch / calibCameraDistInch)
-    horzAngleDegree = horzAngleRadians * radiansToDegrees
-
-    #if saveCount % 5 == 0:
-    cv2.circle(frame, centerInt, radiusInt, [255,0,0], 3, cv2.LINE_AA)
-    cv2.drawMarker(frame, (int(imageCenterX), int(imageCenterY)), [0, 0, 255], cv2.MARKER_CROSS)
-    cv2.imwrite("InRange.jpg", InRange)
-    cv2.imwrite("ImagingOutput.jpg", frame)                               
-
-    saveCount = saveCount + 1
-
-    # end timing
-    endTime = time.time()
-    elapsed = endTime-startTime
-    elapsedAccum = elapsedAccum + elapsed
-    elapsedAccumCamRead = elapsedAccumCamRead + elapsedCam
-    print(elapsed, ",", elapsedAccum / loopCount, ",",  elapsedCam, ",",  elapsedAccumCamRead / loopCount, ",",  DistZ, ",", horzAngleDegree)
-    #Incrament the loop counter
-    loopCount = loopCount + 1
