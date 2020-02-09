@@ -3,3 +3,5 @@ is there a resize function - by 1/2
 Hough transform for circle identification right off inrange
 Recode find biggest contour to find biggest circle radius
 cut down resolution 
+
+Try using a generator to make variables local
