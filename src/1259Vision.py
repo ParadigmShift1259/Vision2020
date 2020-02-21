@@ -9,24 +9,52 @@ import math
 #time.sleep(15)
 
 cs = cscore.CameraServer.getInstance()
-cs.enableLogging()
 
+#Exception block for handling network table initialization
 try:
     nt.NetworkTables.initialize(server="10.12.59.2")
     print("NetworkTable found!")
     SmartDashboard = nt.NetworkTables.getTable("SmartDashboard")
 except:
     print("No network table found continuing with the rest of the code")
+    print("")
 
-Back = cs.startAutomaticCapture(name = "BackCamera", path = "/dev/v4l/by-path/platform-3f980000.usb-usb-0:1.2:1.0-video-index0")
-Back.setResolution(640, 480)
 
-Front = cs.startAutomaticCapture(name = "FrontCamera", path = "/dev/v4l/by-path/platform-3f980000.usb-usb-0:1.1:1.0-video-index0")
-Front.setResolution(640, 480)
+#Function to set up the back camera
+def SetupBackCamera():
+    global Back
+    Back = cs.startAutomaticCapture(name = "BackCamera", path = "/dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.2:1.0-video-index0")
+    Back.setResolution(640, 480)
+    print("Setting up back camera")
+#Actually set the back camera up
+SetupBackCamera()
 
+
+#Function to set up the front camera
+def SetupFrontCamera():
+    global Front
+    Front = cs.startAutomaticCapture(name = "FrontCamera", path = "/dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.1:1.0-video-index0")
+    Front.setResolution(640, 480)
+    print("Setting up front camera")
+#Actually set the front camera up
+SetupFrontCamera()
+
+
+#Adding cameras to switched camera so we can "Switch"
 server = cs.addSwitchedCamera("SwitchedCamera")
 
-print("Starting code stuff")
+
+#Just me and Jival having some fun 
+def FunStuff():
+    print("Starting code stuff")
+    print("Bleep-boop-bleep")
+    print("Contacting Skynet ...")
+    print("Contacting Skynet ...")
+    print("Ready to terminate Agastya and Jival ...")
+    print("ERROR: CURRENT_DATE != 2025 ...")
+    print("Hail Skynet ...")
+#Do fun stuff
+FunStuff()
 
 #Camera width and height will essentially equal the resolution that has been hardcoded
 camWid = 640
@@ -46,8 +74,8 @@ MaxPossibleRadius = (DefaultImageHeight / 2) #MEASURED IN INCHES
 MinPossibleRadius = 0   #WE NEED TO CALCULATE THIS
 
 #Maximum and minimum possible HSV values to detect the ball
-minHSVBall = np.array([18, 100, 100])
-maxHSVBall = np.array([40, 255, 255])
+minHSVBall = np.array([20, 100, 50])
+maxHSVBall = np.array([45, 255, 255])
 
 #X and Y coordinate of the center of the image
 imageCenterX = camWid / 2
@@ -56,44 +84,43 @@ imageCenterY = camHgt / 2
 #Scaling the image
 img = np.zeros(shape=(640, 480, 3), dtype=np.uint8)
 scale_percent = 50 # percent of original size
-width = int(img.shape[1] * scale_percent / 100)
-height = int(img.shape[0] * scale_percent / 100)
+width = int(img.shape[0] * scale_percent / 100)
+height = int(img.shape[1] * scale_percent / 100)
 dim = (width, height)
 
-runCalculation = True
+runCalculation = False
 
-visionCounter = 0
-
+imageCounter = 0
 
 def Vision():
 
     global img
+    global imageCounter
+    global runCalculation
+
+    imageCounter += 1
 
     try:
-    	cameraFeed = SmartDashboard.getNumber("cameraFeed", 0)
+        cameraFeed = SmartDashboard.getNumber("cameraFeed", 0)
     except:
         cameraFeed = 0
         print("Couldn't get cameraFeed value because no network table was found\nDefault to 0")
 
     if cameraFeed == 0:
-        
-        print("Using front camera")
-        visionCounter += 1
 
         try:
             SmartDashboard.putString("VisionCodeSelected", "0")
         except:
             print("Cannot put string because network table was not found")
-       
+
         Front.setConnectionStrategy(cscore.VideoSource.ConnectionStrategy.kKeepOpen)
         Back.setConnectionStrategy(cscore.VideoSource.ConnectionStrategy.kForceClose)
 
-        cvSink = cscore.CvSink("FrontSink")
+        #cvSink = cscore.CvSink("FrontSink")
+        cvSink = cscore.CvSink("cvsink")
         cvSink.setSource(Front)
-
-        cvSource = cscore.CvSource("FrontCVSource", cscore.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
                 
-        time, img = cvSink.grabFrame(img)
+        time0, img = cvSink.grabFrame(img)
 
         img = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)
 
@@ -103,24 +130,41 @@ def Vision():
         InRange = cv2.inRange(imHSV, minHSVBall, maxHSVBall)
 
         InRange = cv2.GaussianBlur(InRange, (5, 5), cv2.BORDER_DEFAULT)
+        if(imageCounter % 5 == 0):
+            cv2.imwrite("Inrange%d.png" % imageCounter, InRange)
 
-        circles = cv2.HoughCircles(InRange, cv2.HOUGH_GRADIENT, 1, int(height/10), 100, 25, 5, int(height/2))
+        circles = cv2.HoughCircles(InRange, cv2.HOUGH_GRADIENT, 1, int(height/10), 150, 50, int(height/20), int(height/4))
         circles = np.uint16(np.around(circles))
 
         biggest_radius = 0;
         for i in circles[0,:]:
             try:
 
-                if (biggest_radius < i[2]):
-                    biggest_radius = i[2]
-                    biggestX = i[0]
-                    biggestY = i[1]
+                #if (biggest_radius < i[2]):
+                #    biggest_radius = i[2]
+                #    biggestX = i[0]
+                #    biggestY = i[1]
+                # draw the outer circle
+                cv2.circle(img,(i[0],i[1]),i[2],(0,255,0),2)
+                # draw the center of the circle
+                cv2.circle(img,(i[0],i[1]),2,(0,0,255),3)
             except IndexError:
                 print("No ball found")
                 runCalculation = False
                 continue
         
+        if(imageCounter % 5 == 0):
+                cv2.imwrite("Image%d.jpg" % imageCounter, img)
+
         if runCalculation:
+
+            # draw the outer circle
+            #cv2.circle(img,(biggestX,biggestY),biggest_radius,(0,255,0),2)
+            # draw the center of the circle
+            #cv2.circle(img, (biggestX,biggestY),2,(0,0,255),3)
+
+            #if(imageCounter % 5 == 0):
+              #  cv2.imwrite("Image%d.jpg" % imageCounter, img)
             
             ActualBallHeightPixel = DefaultBallHeightPixel / (DefaultImageHeight / height)
             ActualPixelsPerInch = DefaultPixelsPerInch / (DefaultImageHeight / height)
@@ -129,18 +173,18 @@ def Vision():
             XDisaplacementPixel = biggestX - (width / 2)
             YDisplacmentPixel = biggestY - (height / 2)
             YAngle = math.atan(YDisplacmentPixel/(ActualPixelsPerInch * DefaultPixelsPerInch)) #MEASURED IN RADIANS
-            XAngle = math.atan(XDisplacement/(ActualPixelsPerInch * DefaultPixelsPerInch)) * (180/np.pi) #MEASURED IN DEGREES
+            XAngle = math.atan(XDisaplacementPixel/(ActualPixelsPerInch * DefaultPixelsPerInch)) * (180/np.pi) #MEASURED IN DEGREES
 
             ZDistance = DirectDistanceBallInch * math.cos(YAngle) #ROBOT DISTANCE TO BALL
             
 
             try:
-                SmartDashboard.putNumber("VisionCounter", visionCounter) 
                 SmartDashboard.putNumber("ZDistance", ZDistance)
                 SmartDashboard.putNumber("DirectDistance", XAngle)
+            except:
+                print("Could not find network tables")
 
-            draw = cv2.circle(draw, (biggestX, biggestY), biggest_radius, (255, 0, 0), 5)
-
+            #img = cv2.circle(img, (biggestX, biggestY), biggest_radius, (255, 0, 0), 5
         else:
             print("could not find any object so decided to skip calculations as well")
 
@@ -148,10 +192,8 @@ def Vision():
     if cameraFeed == 1:
 
         print("Using back camera")
-        visionCounter += 1
 
         try:
-            SmartDashboard.putNumber("VisionCounter", visionCounter)
             SmartDashboard.putString("VisionCodeSelected", "1")
         except:
             print("Cannot put string because network table was not found")
@@ -161,6 +203,7 @@ def Vision():
 
 
 while True:
-	Vision()
+    #time.sleep(2)
+    Vision()
 
     
