@@ -62,9 +62,12 @@ camHgt = 480
 
 #Variables that will be needed to do distance calculations - FIRST Gen. Variables 
 DefaultImageHeight = 240
-DefaultBallHeightPixel = 121.243 
-DefaultPixelsPerInch = 17.32  
-CalibrationDistanceInch = 12 
+DefaultBallHeightPixel = 80.8 
+DefaultBallRadiusInch = 3.5
+DefaultPixelsPerInch = 11.55  
+CalibrationDistanceInch = 16 
+HeightOfCamera = 18.3125
+CameraMountingAngleRadians = 28.0 * (np.pi/180)
 
 MaxPossibleAngle = 60 # MEASURED IN DEGREES 
 MaxPossibleDistance = 120 # MEASURED IN INCHES
@@ -74,7 +77,7 @@ MaxPossibleRadius = (DefaultImageHeight / 2) #MEASURED IN INCHES
 MinPossibleRadius = 0   #WE NEED TO CALCULATE THIS
 
 #Maximum and minimum possible HSV values to detect the ball
-minHSVBall = np.array([20, 100, 50])
+minHSVBall = np.array([20, 100, 55])
 maxHSVBall = np.array([45, 255, 255])
 
 #X and Y coordinate of the center of the image
@@ -88,8 +91,8 @@ width = int(img.shape[0] * scale_percent / 100)
 height = int(img.shape[1] * scale_percent / 100)
 dim = (width, height)
 
-runCalculation = False
-
+runCalculation = True
+saveImage = True
 imageCounter = 0
 
 def Vision():
@@ -130,38 +133,48 @@ def Vision():
         InRange = cv2.inRange(imHSV, minHSVBall, maxHSVBall)
 
         InRange = cv2.GaussianBlur(InRange, (5, 5), cv2.BORDER_DEFAULT)
-        if(imageCounter % 5 == 0):
-            cv2.imwrite("Inrange%d.png" % imageCounter, InRange)
+        if saveImage:
+            if(imageCounter % 5 == 0):
+                cv2.imwrite("Inrange%d.png" % imageCounter, InRange)
 
-        circles = cv2.HoughCircles(InRange, cv2.HOUGH_GRADIENT, 1, int(height/10), 150, 50, int(height/20), int(height/4))
+        #circles = cv2.HoughCircles(InRange, cv2.CV_HOUGH_GRADIENT, 2, int(height/10), 150, 50, 10, 60)
+        circles = cv2.HoughCircles(InRange, cv2.HOUGH_GRADIENT, 1, int(width/10), param1=180, param2=10, minRadius=5, maxRadius=50)
         circles = np.uint16(np.around(circles))
 
-        biggest_radius = 0;
+        global biggest_radius
+        global biggestX
+        global biggestY
+        biggest_radius = 0
         for i in circles[0,:]:
             try:
 
-                #if (biggest_radius < i[2]):
-                #    biggest_radius = i[2]
-                #    biggestX = i[0]
-                #    biggestY = i[1]
-                # draw the outer circle
-                cv2.circle(img,(i[0],i[1]),i[2],(0,255,0),2)
+                if (biggest_radius < i[2]):
+                    biggest_radius = i[2]
+                    biggestX = i[0]
+                    biggestY = i[1]
+
+
+                    # draw the outer circle
+                cv2.circle(img,(biggestX,biggestY),biggest_radius,(0,255,0),2)
                 # draw the center of the circle
-                cv2.circle(img,(i[0],i[1]),2,(0,0,255),3)
+                cv2.circle(img, (biggestX,biggestY),2,(0,0,255),3)
+                # draw the outer circle
+                #cv2.circle(img,(i[0],i[1]),i[2],(0,255,0),2)
+                # draw the center of the circle
+                #cv2.circle(img,(i[0],i[1]),2,(0,0,255),3)
             except IndexError:
                 print("No ball found")
                 runCalculation = False
                 continue
-        
+        #if saveImage:
         if(imageCounter % 5 == 0):
-                cv2.imwrite("Image%d.jpg" % imageCounter, img)
+            cv2.imwrite("Image%d.jpg" % imageCounter, img)
 
         if runCalculation:
 
-            # draw the outer circle
-            #cv2.circle(img,(biggestX,biggestY),biggest_radius,(0,255,0),2)
-            # draw the center of the circle
-            #cv2.circle(img, (biggestX,biggestY),2,(0,0,255),3)
+            #print("BiggestX = " + str(biggestX))
+            #print("BiggestY = " + str(biggestY))
+            #print("Biggest radius = " + str(biggest_radius))
 
             #if(imageCounter % 5 == 0):
               #  cv2.imwrite("Image%d.jpg" % imageCounter, img)
@@ -173,15 +186,21 @@ def Vision():
             XDisaplacementPixel = biggestX - (width / 2)
             YDisplacmentPixel = biggestY - (height / 2)
             YAngle = math.atan(YDisplacmentPixel/(ActualPixelsPerInch * DefaultPixelsPerInch)) #MEASURED IN RADIANS
+
             XAngle = math.atan(XDisaplacementPixel/(ActualPixelsPerInch * DefaultPixelsPerInch)) * (180/np.pi) #MEASURED IN DEGREES
 
-            ZDistance = DirectDistanceBallInch * math.cos(YAngle) #ROBOT DISTANCE TO BALL
+            #ZDistance = DirectDistanceBallInch * math.cos(YAngle) #ROBOT DISTANCE TO BALL
+            ZDistance = (HeightOfCamera - DefaultBallRadiusInch) / math.tan(CameraMountingAngleRadians + YAngle)
             
 
             try:
                 SmartDashboard.putNumber("ZDistance", ZDistance)
-                SmartDashboard.putNumber("DirectDistance", XAngle)
+                print("ZDistance = " + ZDistance)
+                SmartDashboard.putNumber("Xangle", XAngle)
+                print("Xangle = " + XAngle)
             except:
+                print("ZDistance = " + str(ZDistance))
+                print("Xangle = " + str(XAngle))
                 print("Could not find network tables")
 
             #img = cv2.circle(img, (biggestX, biggestY), biggest_radius, (255, 0, 0), 5
