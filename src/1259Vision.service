@@ -3,7 +3,7 @@ Description = Visioning yellow balls on ground with camera switching
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/python3 -u 1259Vision.py
+ExecStart=python3 1259Vision.py
 WorkingDirectory=/home/pi/Vision2020/src
 StandardOutput=inherit
 StandardError=inherit
