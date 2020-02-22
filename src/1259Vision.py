@@ -62,10 +62,9 @@ camHgt = 480
 
 #Variables that will be needed to do distance calculations - FIRST Gen. Variables 
 DefaultImageHeight = 240
-DefaultBallHeightPixel = 80.8 
-DefaultBallRadiusInch = 3.5
-DefaultPixelsPerInch = 11.55  
+DefaultBallRadiusInch = 3.5 
 CalibrationDistanceInch = 16 
+DefaultCameraViewAngle = 60     #Vertical angle for camera
 HeightOfCamera = 18.3125
 CameraMountingAngleRadians = 28.0 * (np.pi/180)
 
@@ -75,6 +74,8 @@ MaxPossibleDistance = 120 # MEASURED IN INCHES
 #Variables needed to distance calculations - SECOND Gen. Variables
 MaxPossibleRadius = (DefaultImageHeight / 2) #MEASURED IN INCHES 
 MinPossibleRadius = 0   #WE NEED TO CALCULATE THIS
+DefaultPixelsPerInch = DefaultBallRadiusInch/(math.tan((DefaultCameraViewAngle/2) * (np.pi/180)) * CalibrationDistanceInch) * DefaultImageHeight
+DefaultBallHeightPixel = (DefaultImageHeight/2)/(math.tan((DefaultCameraViewAngle/2) * (np.pi/180)) * CalibrationDistanceInch)
 
 #Maximum and minimum possible HSV values to detect the ball
 minHSVBall = np.array([20, 100, 55])
@@ -190,7 +191,8 @@ def Vision():
             XAngle = math.atan(XDisaplacementPixel/(ActualPixelsPerInch * DefaultPixelsPerInch)) * (180/np.pi) #MEASURED IN DEGREES
 
             #ZDistance = DirectDistanceBallInch * math.cos(YAngle) #ROBOT DISTANCE TO BALL
-            ZDistance = (HeightOfCamera - DefaultBallRadiusInch) / math.tan(CameraMountingAngleRadians + YAngle)
+            #ZDistance = DirectDistanceBallInch * math.sin((CameraMountingAngleRadians - YAngle))
+            ZDistance = (HeightOfCamera - DefaultBallRadiusInch)/math.tan((CameraMountingAngleRadians - YAngle))
             
 
             try:
