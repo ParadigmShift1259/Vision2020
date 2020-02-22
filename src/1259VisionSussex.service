@@ -3,7 +3,7 @@ Description = Camera Switching Python Program
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/python3 -u 1259VisionSussex.py
+ExecStart=python3 1259VisionSussex.py
 WorkingDirectory=/home/pi/Vision2020/src
 StandardOutput=inherit
 StandardError=inherit
