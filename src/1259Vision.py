@@ -190,9 +190,8 @@ def Vision():
 
             XAngle = math.atan(XDisaplacementPixel/(ActualPixelsPerInch * DefaultPixelsPerInch)) * (180/np.pi) #MEASURED IN DEGREES
 
-            #ZDistance = DirectDistanceBallInch * math.cos(YAngle) #ROBOT DISTANCE TO BALL
-            #ZDistance = DirectDistanceBallInch * math.sin((CameraMountingAngleRadians - YAngle))
-            ZDistance = (HeightOfCamera - DefaultBallRadiusInch)/math.tan((CameraMountingAngleRadians - YAngle))
+            ZDistance = DirectDistanceBallInch * math.cos((CameraMountingAngleRadians - YAngle))
+            #ZDistance = (HeightOfCamera - DefaultBallRadiusInch)/math.tan((CameraMountingAngleRadians - YAngle))
             
 
             try:
