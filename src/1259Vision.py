@@ -19,6 +19,38 @@ except:
     print("No network table found continuing with the rest of the code")
     print("")
 
+class SmoothenClass:
+    def __init__(self, order):
+        self.order = order
+        self.x = np.arange(8.0)
+        self.y = np.arange(8.0)
+
+
+    def AddValue(self, string, index, float):
+        if string == "Distance":
+            self.y[index] = float
+        if string == "Time":
+            self.x[index] = float
+
+    def AppendValues(self, string, float):
+        if string == "Distance":
+            self.y = np.delete(self.y, 0)
+            self.y = np.append(self.y, float)
+        if string == "Time":
+            self.x = np.delete(self.x, 0)
+            self.x = np.append(self.x, float)
+
+    def ReturnPrediction(self):
+        endTime = time.time()
+        timeLapsed = endTime - startTime
+        #print("X Array: " + str(self.x))
+        #print("Y Array: " + str(self.y))
+
+        Regression = np.polyfit(self.x, self.y, self.order)
+        Predictor = np.poly1d(Regression)
+        return Predictor(timeLapsed)
+
+
 
 #Function to set up the back camera
 def SetupBackCamera():
@@ -64,9 +96,9 @@ camHgt = 480
 DefaultImageHeight = 240
 DefaultBallRadiusInch = 3.5 
 CalibrationDistanceInch = 16 
-DefaultCameraViewAngle = 60     #Vertical angle for camera
+DefaultCameraViewAngle = 36     #Vertical angle for camera 60
 HeightOfCamera = 18.3125
-CameraMountingAngleRadians = 28.0 * (np.pi/180)
+CameraMountingAngleRadians = 28.0 * (np.pi/180) #CameraMounting angle
 
 MaxPossibleAngle = 60 # MEASURED IN DEGREES 
 MaxPossibleDistance = 120 # MEASURED IN INCHES
@@ -74,9 +106,8 @@ MaxPossibleDistance = 120 # MEASURED IN INCHES
 #Variables needed to distance calculations - SECOND Gen. Variables
 MaxPossibleRadius = (DefaultImageHeight / 2) #MEASURED IN INCHES 
 MinPossibleRadius = 0   #WE NEED TO CALCULATE THIS
-DefaultPixelsPerInch = DefaultBallRadiusInch/(math.tan((DefaultCameraViewAngle/2) * (np.pi/180)) * CalibrationDistanceInch) * DefaultImageHeight
-DefaultBallHeightPixel = (DefaultImageHeight/2)/(math.tan((DefaultCameraViewAngle/2) * (np.pi/180)) * CalibrationDistanceInch)
-
+DefaultPixelsPerInch = (DefaultImageHeight/2)/(math.tan((DefaultCameraViewAngle/2) * (np.pi/180)) * CalibrationDistanceInch)
+DefaultBallHeightPixel = DefaultBallRadiusInch/(math.tan((DefaultCameraViewAngle/2) * (np.pi/180)) * CalibrationDistanceInch) * DefaultImageHeight
 #Maximum and minimum possible HSV values to detect the ball
 minHSVBall = np.array([20, 100, 55])
 maxHSVBall = np.array([45, 255, 255])
@@ -92,38 +123,69 @@ width = int(img.shape[0] * scale_percent / 100)
 height = int(img.shape[1] * scale_percent / 100)
 dim = (width, height)
 
+#Whether or not to do calculations
 runCalculation = True
-saveImage = True
+#Whether or not to save images
+saveImage = False
+#Helps in labeling images so that they are not overwritten
 imageCounter = 0
+#How many time to repeat adding value to x and y lists
+repeatPolyFit = 0
+#Counter to tell whether vision has stopped working or not
+VisionCounter = 0
+#Timer for the x-value of plotting direction
+startTime = time.time()
+
+#Smoothening class which takes the order as a perimeter
+Smooth = SmoothenClass(1)
 
 def Vision():
 
+    #Timer used to determine how many seconds it took to run vision helps with FPS
+    t0 = time.time()
+
+    #Variables that needed to be global so the function could use them 
     global img
     global imageCounter
+    global VisionCounter
+    global repeatPolyFit
+    global Smooth
     global runCalculation
 
+    #Incrementing the image counter so that every image is renamed different
     imageCounter += 1
+    #Increment this counter so that changing values represent working vision
+    VisionCounter += 1
 
+    #If getting camera feed from network table is an issue then default to using front camera
     try:
         cameraFeed = SmartDashboard.getNumber("cameraFeed", 0)
+        getNewBall = 0
+        SmartDashboard.putNumber("VisionCounter", VisionCounter)
+
     except:
         cameraFeed = 0
+        getNewBall = 0
         print("Couldn't get cameraFeed value because no network table was found\nDefault to 0")
 
+    #If using front camera
     if cameraFeed == 0:
 
+        #If network tables is causing issue then report it
         try:
             SmartDashboard.putString("VisionCodeSelected", "0")
         except:
             print("Cannot put string because network table was not found")
 
+        #Enable only front camera stream
         Front.setConnectionStrategy(cscore.VideoSource.ConnectionStrategy.kKeepOpen)
         Back.setConnectionStrategy(cscore.VideoSource.ConnectionStrategy.kForceClose)
 
-        #cvSink = cscore.CvSink("FrontSink")
+        #Creating an opencv sink 
         cvSink = cscore.CvSink("cvsink")
         cvSink.setSource(Front)
                 
+        #Grabbing an image and storing in img varibale
         time0, img = cvSink.grabFrame(img)
 
         img = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)
@@ -133,57 +195,66 @@ def Vision():
         #Find pixels in the blurred image that fit in range and turn them white and others black                                          
         InRange = cv2.inRange(imHSV, minHSVBall, maxHSVBall)
 
+        #Blurring the InRange so HoughCircles have an easier time finding balls
         InRange = cv2.GaussianBlur(InRange, (5, 5), cv2.BORDER_DEFAULT)
+
+        #Save the inrange if told to do so
         if saveImage:
             if(imageCounter % 5 == 0):
                 cv2.imwrite("Inrange%d.png" % imageCounter, InRange)
 
         #circles = cv2.HoughCircles(InRange, cv2.CV_HOUGH_GRADIENT, 2, int(height/10), 150, 50, 10, 60)
         circles = cv2.HoughCircles(InRange, cv2.HOUGH_GRADIENT, 1, int(width/10), param1=180, param2=10, minRadius=5, maxRadius=50)
-        circles = np.uint16(np.around(circles))
-
-        global biggest_radius
-        global biggestX
-        global biggestY
-        biggest_radius = 0
-        for i in circles[0,:]:
-            try:
-
-                if (biggest_radius < i[2]):
-                    biggest_radius = i[2]
-                    biggestX = i[0]
-                    biggestY = i[1]
-
-
-                    # draw the outer circle
-                cv2.circle(img,(biggestX,biggestY),biggest_radius,(0,255,0),2)
-                # draw the center of the circle
-                cv2.circle(img, (biggestX,biggestY),2,(0,0,255),3)
-                # draw the outer circle
-                #cv2.circle(img,(i[0],i[1]),i[2],(0,255,0),2)
-                # draw the center of the circle
-                #cv2.circle(img,(i[0],i[1]),2,(0,0,255),3)
-            except IndexError:
-                print("No ball found")
-                runCalculation = False
-                continue
-        #if saveImage:
-        if(imageCounter % 5 == 0):
-            cv2.imwrite("Image%d.jpg" % imageCounter, img)
+        #circles = cv2.HoughCircles(InRange, cv2.HOUGH_GRADIENT, 1, int(width/10), param1=150, param2=35, minRadius=5, maxRadius=50)
+        try:
+            circles = np.uint16(np.around(circles))
+        except AttributeError:
+            runCalculation = False
+            repeatPolyFit = 0
 
         if runCalculation:
+            global biggest_radius
+            global biggestX
+            global biggestY
+            global startTime
+            biggest_radius = 0
+            for i in circles[0,:]:
+                try:
 
+                    if (biggest_radius < i[2]):
+                        biggest_radius = i[2]
+                        biggestX = i[0]
+                        biggestY = i[1]
+
+
+                        # draw the outer circle
+                    cv2.circle(img,(biggestX,biggestY),biggest_radius,(0,255,0),2)
+                    # draw the center of the circle
+                    cv2.circle(img, (biggestX,biggestY),2,(0,0,255),3)
+                    # draw the outer circle
+                    #cv2.circle(img,(i[0],i[1]),i[2],(0,255,0),2)
+                    # draw the center of the circle
+                    #cv2.circle(img,(i[0],i[1]),2,(0,0,255),3)
+                except IndexError:
+                    print("No ball found")
+
+            if saveImage:
+                if(imageCounter % 5 == 0):
+                    cv2.imwrite("Image%d.jpg" % imageCounter, img)
+
+        
             #print("BiggestX = " + str(biggestX))
             #print("BiggestY = " + str(biggestY))
             #print("Biggest radius = " + str(biggest_radius))
 
             #if(imageCounter % 5 == 0):
-              #  cv2.imwrite("Image%d.jpg" % imageCounter, img)
+                #  cv2.imwrite("Image%d.jpg" % imageCounter, img)
             
             ActualBallHeightPixel = DefaultBallHeightPixel / (DefaultImageHeight / height)
             ActualPixelsPerInch = DefaultPixelsPerInch / (DefaultImageHeight / height)
 
             DirectDistanceBallInch = ((ActualBallHeightPixel / (2 * biggest_radius)) * CalibrationDistanceInch)
+            #print("DirectDistanceBallInch = " + str(DirectDistanceBallInch) + " Biggest Radius = " + str(biggest_radius))
             XDisaplacementPixel = biggestX - (width / 2)
             YDisplacmentPixel = biggestY - (height / 2)
             YAngle = math.atan(YDisplacmentPixel/(ActualPixelsPerInch * DefaultPixelsPerInch)) #MEASURED IN RADIANS
@@ -191,22 +262,67 @@ def Vision():
             XAngle = math.atan(XDisaplacementPixel/(ActualPixelsPerInch * DefaultPixelsPerInch)) * (180/np.pi) #MEASURED IN DEGREES
 
             ZDistance = DirectDistanceBallInch * math.cos((CameraMountingAngleRadians - YAngle))
+            #print("getNewBall: " + str(getNewBall))
+            #print("RepeatPolyFit: " + str(repeatPolyFit))
             #ZDistance = (HeightOfCamera - DefaultBallRadiusInch)/math.tan((CameraMountingAngleRadians - YAngle))
             
+            relativeEndTime = time.time()
+            timeLapsed = relativeEndTime - startTime
+            readyForPrediction = False
+            
+            if(getNewBall < 4):
+                if(repeatPolyFit < 8):
+                    #print("Running 15 & ZDistance: " + str(ZDistance) + " TimeNEW: " + str(timeLapsed))
+                    Smooth.AddValue("Distance", repeatPolyFit, ZDistance)
+                    Smooth.AddValue("Time", repeatPolyFit, timeLapsed)
+                    repeatPolyFit += 1
+                else:
+                    readyForPrediction = True
 
-            try:
-                SmartDashboard.putNumber("ZDistance", ZDistance)
-                print("ZDistance = " + ZDistance)
-                SmartDashboard.putNumber("Xangle", XAngle)
-                print("Xangle = " + XAngle)
-            except:
-                print("ZDistance = " + str(ZDistance))
-                print("Xangle = " + str(XAngle))
-                print("Could not find network tables")
+                if (readyForPrediction):
+                    answer = Smooth.ReturnPrediction()
+                    print("ZDistance = " + str(ZDistance))
+                    print("Predtion = " + str(answer))
+                    #print("In range = " + str(abs(ZDistance - answer)))
+                    if (abs(ZDistance - answer) < 6.56 ):
+                        Smooth.AppendValues("Distance", ZDistance)
+                        ZDistance = answer
+                        endTime = time.time()
+                        elapsedTime = endTime - startTime
+                        print("FeedingTime = " + str(elapsedTime))
+                        Smooth.AppendValues("Time", elapsedTime)
+                    else:
+                        getNewBall += 1
+                        answer = 0
+                        Smooth.AppendValues("Distance", ZDistance)
+                        endTime = time.time()
+                        elapsedTime = endTime - startTime
+                        #print("FeedingTime = " + str(elapsedTime))
+                        Smooth.AppendValues("Time", elapsedTime)
 
-            #img = cv2.circle(img, (biggestX, biggestY), biggest_radius, (255, 0, 0), 5
+
+            elif(getNewBall == 4):
+                repeatPolyFit = 0
+                getNewBall = 0
+                ZDistance = 0
+                XAngle = 0
+                startTime = time.time()
+            
+            SmartDashboard.putNumber("ZDistance", ZDistance)
+            #print("ZDistance = " + str(ZDistance))
+            SmartDashboard.putNumber("Xangle", XAngle)
+            #print("Xangle = " + str(XAngle))
+
         else:
             print("could not find any object so decided to skip calculations as well")
+            ZDistance = 0
+            XAngle = 0
+            SmartDashboard.putNumber("ZDistance", ZDistance)
+            print("ZDistance = " + str(ZDistance))
+            SmartDashboard.putNumber("Xangle", XAngle)
+            print("Xangle = " + str(XAngle))
+            
+        print("The time it took " + str(time.time()-t0))
 
 
     if cameraFeed == 1:
@@ -220,6 +336,8 @@ def Vision():
 
         Front.setConnectionStrategy(cscore.VideoSource.ConnectionStrategy.kForceClose)
         Back.setConnectionStrategy(cscore.VideoSource.ConnectionStrategy.kKeepOpen)
+
+        startTime = time.time()
 
 
 while True:
