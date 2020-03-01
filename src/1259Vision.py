@@ -5,8 +5,9 @@ import cv2
 import time
 import numpy as np 
 import math
+import logging
 
-#time.sleep(15)
+time.sleep(5)
 
 cs = cscore.CameraServer.getInstance()
 
@@ -50,7 +51,17 @@ class SmoothenClass:
         Predictor = np.poly1d(Regression)
         return Predictor(timeLapsed)
 
+f = open("1259VisionMatchNumber.txt", "r")
+MatchNumber = int(f.read())
+MatchNumber += 1
+f.close()
+f = open("1259VisionMatchNumber.txt", "w")
+f.write(str(MatchNumber))
+print(MatchNumber)
+f.close()
 
+filename = "1259VisionLogMatch%d.log" % MatchNumber
+logging.basicConfig(level=logging.INFO, filename=filename, format='%(asctime)s :: %(levelname)s :: %(message)s')
 
 #Function to set up the back camera
 def SetupBackCamera():
@@ -161,11 +172,13 @@ def Vision():
     try:
         cameraFeed = SmartDashboard.getNumber("cameraFeed", 0)
         getNewBall = 0
+        runCalculation = True
         SmartDashboard.putNumber("VisionCounter", VisionCounter)
 
     except:
         cameraFeed = 0
         getNewBall = 0
+        runCalculation = True
         print("Couldn't get cameraFeed value because no network table was found\nDefault to 0")
 
     #If using front camera
@@ -180,6 +193,7 @@ def Vision():
         #Enable only front camera stream
         Front.setConnectionStrategy(cscore.VideoSource.ConnectionStrategy.kKeepOpen)
         Back.setConnectionStrategy(cscore.VideoSource.ConnectionStrategy.kForceClose)
+        logging.info("Using front camera")
 
         #Creating an opencv sink 
         cvSink = cscore.CvSink("cvsink")
@@ -211,6 +225,7 @@ def Vision():
         except AttributeError:
             runCalculation = False
             repeatPolyFit = 0
+            logging.warning("No ball was found at this time")
 
         if runCalculation:
             global biggest_radius
@@ -226,17 +241,15 @@ def Vision():
                         biggestX = i[0]
                         biggestY = i[1]
 
-
+                    if(saveImage):
                         # draw the outer circle
-                    cv2.circle(img,(biggestX,biggestY),biggest_radius,(0,255,0),2)
-                    # draw the center of the circle
-                    cv2.circle(img, (biggestX,biggestY),2,(0,0,255),3)
-                    # draw the outer circle
-                    #cv2.circle(img,(i[0],i[1]),i[2],(0,255,0),2)
-                    # draw the center of the circle
-                    #cv2.circle(img,(i[0],i[1]),2,(0,0,255),3)
+                        cv2.circle(img,(biggestX,biggestY),biggest_radius,(0,255,0),2)
+                        # draw the center of the circle
+                        cv2.circle(img, (biggestX,biggestY),2,(0,0,255),3)
+
                 except IndexError:
                     print("No ball found")
+                    logging.warning("No values in the hough circle array")
 
             if saveImage:
                 if(imageCounter % 5 == 0):
@@ -269,7 +282,7 @@ def Vision():
             relativeEndTime = time.time()
             timeLapsed = relativeEndTime - startTime
             readyForPrediction = False
-            
+
             if(getNewBall < 4):
                 if(repeatPolyFit < 8):
                     #print("Running 15 & ZDistance: " + str(ZDistance) + " TimeNEW: " + str(timeLapsed))
@@ -278,10 +291,13 @@ def Vision():
                     repeatPolyFit += 1
                 else:
                     readyForPrediction = True
+                    print("We are ready for prediction")
 
                 if (readyForPrediction):
                     answer = Smooth.ReturnPrediction()
                     print("ZDistance = " + str(ZDistance))
+                    msgRaw = "RawDistance: %d" % ZDistance
+                    logging.info(msgRaw)
                     print("Predtion = " + str(answer))
                     #print("In range = " + str(abs(ZDistance - answer)))
                     if (abs(ZDistance - answer) < 6.56 ):
@@ -309,8 +325,12 @@ def Vision():
                 startTime = time.time()
             
             SmartDashboard.putNumber("ZDistance", ZDistance)
+            msgDistance = "Predicted distance: %d" % ZDistance
+            logging.info(msgDistance)
             #print("ZDistance = " + str(ZDistance))
             SmartDashboard.putNumber("Xangle", XAngle)
+            msgAngle = "XAngle: %d" % XAngle
+            logging.info(msgAngle)
             #print("Xangle = " + str(XAngle))
 
         else:
