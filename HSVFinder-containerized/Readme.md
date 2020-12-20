@@ -3,9 +3,11 @@
 ---
 ## How to Use
 
-The source files created here can be used to build the docker image but is 
+NOTE: The source files created here can be used to build the docker image but is 
 not neccesarry because the image needed is already uploaded to cloud and can be be pulled down by running the file in `runMe.sh`.
-Just copy & paste the command in `runMe.sh` into a raspberry pi terminal connected to internet to see the magic!
+
+To run the container get a raspberry pi connected to a Camera and The Internet. After that, just copy & paste the command from 
+`runMe.sh` into the terminal and watch the magic!
 
 ---
 ## About This
