@@ -1,7 +1,12 @@
 # Containerized HSV Finder 
-### Author: Agastya Asthana
+## Author: Agastya Asthana
+---
+## How to Use
+
 The source files created here can be used to build the docker image but is 
-not neccesarry because the image needed is already uploaded to cloud and can be be pulled down by running the file in `runMe.sh`
+not neccesarry because the image needed is already uploaded to cloud and can be be pulled down by running the file in `runMe.sh`.
+Just copy & paste the command in `runMe.sh` into a raspberry pi terminal connected to internet to see the magic!
+
 ---
 ## About This
 This project took me several days and countless failures to achieve. 
